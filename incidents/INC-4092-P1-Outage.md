@@ -1,19 +1,31 @@
-# Incident Ticket: INC-4092-P1
+# Incident Record: INC-4092
 
-**Service Affected:** Order Management & Settlement Pipeline (OMS)  
-**Severity:** P1 - Critical (Trading Flow Impacted)  
-**Status:** Resolved  
-**Reported By:** Automated Monitoring / L1 Support Desk  
-**Assigned To:** Production Support Analyst (Irvinc-Labs)  
+## Metadata
+* **Incident Number:** INC-4092
+* **Priority:** P1 - Critical
+* **State:** Resolved
+* **Service:** Trading Order Ingestion & Settlement Engine
+* **Configuration Item (CI):** TRD-ENG-PROD-01
+* **Assigned Group:** L2 Production Support / Trading Systems
+* **Reported By:** Automated Monitoring Alert
 
----
+## Incident Overview
+* **Short Description:** Order settlement processor failing with unhandled exception during high-volume batch ingest.
+* **Impact:** 100% of order settlements delayed during the affected window, preventing downstream clearing house notifications.
+* **Urgency:** High - Financial market exposure risk.
 
-### Timeline (AEST)
-* **09:15 AM** - Alert triggered: Spike in database timeout exceptions on order `ORD-1002`.
-* **09:18 AM** - L1 desk pages L2 Production Support; incident ticket created.
-* **09:22 AM** - L2 Support investigates `trading_engine.log` and isolates the database pool exhaustion error.
-* **09:30 AM** - Temporary mitigation applied: Cleared stale connections and restarted the worker process.
-* **09:45 AM** - Verification checks confirm trade ingestion and settlement flows have normalized. Incident closed.
+## Timeline (UTC)
+* **08:15:02** - P1 alert triggered via monitoring hook for unhandled exception spike.
+* **08:16:30** - L2 Support acknowledged page and initiated log forensics using grep.
+* **08:22:10** - Root cause isolated to malformed payload handling in settlement module.
+* **08:30:00** - Hotfix applied and service restarted; backlog cleared successfully.
 
-### Resolution Summary
-Identified unclosed transaction handles during peak order matching. Restarted the ingestion service and verified normal execution logs. Handed over to Problem Management for root cause analysis (RCA).
+## Diagnostic & Log Evidence
+Extracted from trading_engine.log:
+[2026-10-16 08:15:02] [ERROR] TRD-ENG: Settlement processor failed on order ID #88412 - NullPointerException in payload parser
+[2026-10-16 08:15:02] [CRITICAL] TRD-ENG: Batch ingestion halted. Manual intervention required.
+
+## Resolution & Next Steps
+* **Resolution Action:** Patched payload parser to handle missing header fields gracefully and restarted the engine process.
+* **Verification:** Confirmed normal transaction flow by verifying zero error occurrences via log count checks (grep -c "ERROR" trading_engine.log).
+* **Preventative Action:** Added automated input validation unit tests to pre-release CI pipeline.
