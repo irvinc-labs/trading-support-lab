@@ -1,20 +1,45 @@
-# Runbook: Handling Stuck Trade Settlements
+# Operational Runbook: RB-01-Stuck-Orders
 
-**Document ID:** RB-01  
-**Target Audience:** L1 / L2 Production Support Analysts  
+## Metadata
+* **Runbook ID:** RB-01
+* **Title:** Diagnostic and Remediation Procedure for Stuck or Delayed Orders
+* **Target Audience:** L1 / L2 Production Support Analysts
+* **System:** Trading Order Ingestion & Settlement Engine (`TRD-ENG-PROD-01`)
+* **Severity Threshold:** P2 / P1 (If order backlog exceeds 500 records)
 
-## Purpose
-To provide step-by-step instructions for identifying and safely resolving orders stuck in a pending settlement state due to database connectivity timeouts.
+## 1. Initial Assessment & Trigger
+This runbook applies when automated monitoring alerts indicate an order processing queue lag or when trade desk operators report delayed order acknowledgments.
 
-## Step 1: Detection & Verification
-1. Check the primary log aggregator or local log file for the error signature:
-   `CRITICAL: Database connection pool exhausted`
-2. Run log checks or inspect `trading_engine.log` to determine the affected order IDs.
+## 2. Immediate Diagnostic Steps (Forensics)
 
-## Step 2: Immediate Mitigation
-1. Notify stakeholders via the incident bridge or chat channel.
-2. Safely restart the local processing daemon.
-3. Validate that incoming orders resume normal processing states (`SUCCESS`).
+### Step 2.1: Verify Process Status
+Check if the trading engine process is active on the Linux host:
+`ps aux | grep order_engine.py`
 
-## Step 3: Escalation
-If connection pool errors persist for more than 15 minutes post-restart, escalate immediately to the Database Administration (DBA) team.
+### Step 2.2: Scan Log File for Active Errors
+Inspect `trading_engine.log` for unhandled exceptions or connection timeouts:
+`grep "ERROR" trading_engine.log`
+`grep "CRITICAL" trading_engine.log`
+
+### Step 2.3: Calculate Error Frequency
+Determine the error count to evaluate severity:
+`grep -c "ERROR" trading_engine.log`
+
+## 3. Standard Remediation Steps
+
+### Option A: Transient Network / Database Lock
+1. Safely stop the order processing daemon.
+2. Verify lock clearance in the database connection pool.
+3. Restart the engine service:
+`python3 app/order_engine.py`
+
+### Option B: Malformed Payload Ingestion
+1. Locate offending order ID from log error output (`grep "ERROR" trading_engine.log`).
+2. Move message to Dead Letter Queue (DLQ) for manual reconciliation.
+3. Resume queue ingestion.
+
+## 4. Escalation Path
+If processing queue depth does not decrease within 15 minutes of service restart:
+1. Escalate to L3 Core Trading Engineering team.
+2. Open Incident ticket in ServiceNow (P1/P2 depending on financial risk).
+3. Notify Trade Operations leads via Incident Bridge.
